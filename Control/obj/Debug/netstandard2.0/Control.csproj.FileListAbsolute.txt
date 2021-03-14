@@ -1,0 +1,9 @@
+C:\Users\ddvan\source\repos\Control\Control\bin\Debug\netstandard2.0\Control.deps.json
+C:\Users\ddvan\source\repos\Control\Control\bin\Debug\netstandard2.0\Control.dll
+C:\Users\ddvan\source\repos\Control\Control\obj\Debug\netstandard2.0\Control.csprojAssemblyReference.cache
+C:\Users\ddvan\source\repos\Control\Control\obj\Debug\netstandard2.0\Control.AssemblyInfoInputs.cache
+C:\Users\ddvan\source\repos\Control\Control\obj\Debug\netstandard2.0\Control.AssemblyInfo.cs
+C:\Users\ddvan\source\repos\Control\Control\bin\Debug\netstandard2.0\Control.pdb
+C:\Users\ddvan\source\repos\Control\Control\obj\Debug\netstandard2.0\Control.dll
+C:\Users\ddvan\source\repos\Control\Control\obj\Debug\netstandard2.0\Control.pdb
+C:\Users\ddvan\source\repos\Control\Control\obj\Debug\netstandard2.0\Control.csproj.CoreCompileInputs.cache

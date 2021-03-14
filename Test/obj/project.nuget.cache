@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "aV8BL551PMm6PMUzkS1ahdw+9VrQ/jbZMWCfzEGBRySxxEqJxxwyH61xc/mb8HIW1Ve2ungi6AT29M0lJxOAdg==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\ddvan\\source\\repos\\ControlToolBox\\Test\\Test.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ddvan\\.nuget\\packages\\mathnet.numerics\\4.15.0\\mathnet.numerics.4.15.0.nupkg.sha512",
+    "C:\\Users\\ddvan\\.nuget\\packages\\system.reactive\\5.0.0\\system.reactive.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
