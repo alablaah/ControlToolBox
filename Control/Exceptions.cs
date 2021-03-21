@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Control
+namespace ControlToolBox
 {
     public class InvalidDimensionsException : Exception
     {
@@ -23,6 +23,18 @@ namespace Control
         // A constructor is needed for serialization when an
         // exception propagates from a remoting server to the client.
         protected AliasingException(System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+    }
+
+    public class SamplingRateRequiredException : Exception
+    {
+        public SamplingRateRequiredException() : base() { }
+        public SamplingRateRequiredException(string message) : base(message) { }
+        public SamplingRateRequiredException(string message, Exception inner) : base(message, inner) { }
+
+        // A constructor is needed for serialization when an
+        // exception propagates from a remoting server to the client.
+        protected SamplingRateRequiredException(System.Runtime.Serialization.SerializationInfo info,
             System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
     }
 

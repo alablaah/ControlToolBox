@@ -1,36 +1,40 @@
 ﻿using System;
-using System.Reactive;
 using MathNet.Numerics;
 using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 
-namespace Control
+namespace ControlToolBox
 {
     public class StateSpace
     {
-        Matrix<double> A;
-        Vector<System.Numerics.Complex> EigenValues;
-        Matrix<double> EigenVectors;
+        public Matrix<double> A { get; private set; }
+        public Vector<System.Numerics.Complex> EigenValues { get; private set; }
+        public Matrix<double> EigenVectors { get; private set; }
 
         Matrix<double> I; //Identify matrix with shape of A
-        int order;
+        public int Order { get; private set; }
 
+        public Matrix<double> B { get; private set; }
+        public Matrix<double> C { get; private set; }
+        public Matrix<double> D { get; private set; }
 
-        Matrix<double> B;
-        Matrix<double> C;
-        Matrix<double> D;
+        public Matrix<double> Ad { get; private set; }
+        public Matrix<double> Bd { get; private set; }
+        public Matrix<double> Cd { get; private set; }
+        public Matrix<double> Dd { get; private set; }
 
-        Matrix<double> Ad;
-        Matrix<double> Bd;
-        Matrix<double> Cd;
-        Matrix<double> Dd;
+        public Vector<double> x_k { get; private set; }
+        public Vector<double> x_knext { get; private set; }
+        public Vector<double> y_k { get; private set; }
 
-        Vector<double> x_k;
-        Vector<double> x_knext;
-        Vector<double> y_k;
+        public Vector<double> TfCoeff_a { get; private set; }
+        public Matrix<double> TfCoeff_b { get; private set; }
 
         double? Tsample;
-        
+
+        Matrix<double> R; // Controllability Gramian
+        Matrix<double> W; // Observability Gramian
+
         private void CheckMatrixDimensions(
             Matrix<double> A, Matrix<double> B, Matrix<double> C, Matrix<double> D
             )
@@ -59,11 +63,11 @@ namespace Control
             this.C = C;
             this.D = D;
 
-            order = this.A.ColumnCount;
+            Order = this.A.ColumnCount;
             Evd<double> decomposition = this.A.Evd();
             EigenValues = decomposition.EigenValues;
             EigenVectors = decomposition.EigenVectors;
-            I = Matrix<double>.Build.DenseIdentity(order: order);
+            I = Matrix<double>.Build.DenseIdentity(order: Order);
 
         }
 
@@ -71,24 +75,23 @@ namespace Control
         {
             if (x0 == null)
             {
-                x_k = Vector<double>.Build.Dense(size: order);
-                x_knext = x_k;
+                x_knext = Vector<double>.Build.Dense(size: Order);
             }
             else
             {
-                if (x0.Count != order)
+                if (x0.Count != Order)
                 {
                     throw new InvalidDimensionsException("Init state vector and A matrix dimensions do not match.");
 
                 }
                 else
                 {
-                    x_k = x0;
-                    x_knext = x_k;
+                    x_knext = x0;
                 }
 
             }
         }
+
         public StateSpace(
             Matrix<double> A, Matrix<double> B, Matrix<double> C, Matrix<double> D,
             double? Ts = null, Vector<double> x0 = null, bool discrete = false
@@ -108,6 +111,10 @@ namespace Control
 
                 // Discr2Cont
 
+            }
+            else if (discrete & Ts == null & Ts == 0)
+            {
+                throw new SamplingRateRequiredException("Please provide a sampling rate or step size.");
             }
             else // not discrete matrices
             {
@@ -133,9 +140,9 @@ namespace Control
         private Matrix<double> CalculateS(double h)
         {
             // first term of sum
-            Matrix<double> S = Matrix<double>.Build.DiagonalIdentity(order) * h;
+            Matrix<double> S = Matrix<double>.Build.DiagonalIdentity(Order) * h;
 
-            for (int n = 2;  n <= order; n++)
+            for (int n = 2;  n <= Order; n++)
             {
                 Matrix<double> Aexp = A.Power(exponent: (n - 1));
                 S += Aexp * Math.Pow(h, n) / SpecialFunctions.Factorial(n);
@@ -169,7 +176,7 @@ namespace Control
             // How to do inverse Laplace transform?
         }
 
-        private void MethodSwitch(string type, double Ts)
+        private void DiscretizationMethodSwitch(string type, double Ts)
         {
             switch(type)
             {
@@ -194,22 +201,24 @@ namespace Control
             }
             if (Ts >= CheckAliasing())
             {
-                throw new AliasingException("Sampling Rate too low for given model");
+                throw new AliasingException("Sampling rate too low for given model");
             }
 
             Tsample = Ts;
 
-            MethodSwitch(type, Ts);
+            DiscretizationMethodSwitch(type, Ts);
 
             Cd = C;
             Dd = D;
         }
+
         private void RunModelStep(Vector<double> u_k)
         {
             x_k = x_knext;
             x_knext = Ad * x_k + Bd * u_k;
             y_k = Cd * x_k + Dd * u_k;
         }
+
         public Vector<double> SimulateStep(Vector<double> u_k, double? Ts = null)
         {
             if (u_k.Count != this.B.ColumnCount)
@@ -217,7 +226,7 @@ namespace Control
 
             if (Ts == null && Tsample == null)
             {
-                // Throw error for not having a sampling time
+                throw new SamplingRateRequiredException("Please provide a sampling rate or step size.");
             }
 
             else if (Ts != null) // Recalibrate discrete model to given Ts
@@ -229,6 +238,122 @@ namespace Control
 
             return y_k;
         }
+
+        public Matrix<double> ComputeControllabilityMatrix()
+        {
+            // first term of sum
+            Matrix<double> R = B;
+
+            for (int n = 2; n <= Order; n++)
+            {
+                Matrix<double> Aexp = A.Power(exponent: (n - 1));
+                R = R.Append(Aexp * B);
+            }
+            return R;
+        }
+
+        public Matrix<double> ComputeObservabilityMatrix()
+        {
+            Matrix<double> W = C.Transpose();
+            for (int n = 2; n <= Order; n++)
+            {
+                Matrix<double> Aexp = A.Power(exponent: (n - 1));
+                W = W.Append((C * Aexp).Transpose());
+            }
+            return W.Transpose();
+        }
+
+        private bool CheckRank(Matrix<double> M, int Rank)
+        {
+            if (M.Rank() == Rank) { return true; }
+            return false;
+        }
+
+        public bool IsControllable()
+        {
+            R = ComputeControllabilityMatrix();
+            return CheckRank(R, Rank: Order);
+        }
+
+        public bool IsObservable()
+        {
+            W = ComputeObservabilityMatrix();
+            return CheckRank(W, Rank: Order);
+        }
+
+        public bool IsInFirstCompanionForm()
+        {
+            Matrix<double> AUpperRight = Utils.SubUpperRight(Matrix: A, Split: Order - 1);
+
+            bool IsAFirstColZero = Utils.IsZero(A.Column(0).SubVector(index: 0, count: Order - 1));
+            bool IsBFirstElementsZero = Utils.IsZero(
+                B.SubMatrix(
+                    rowIndex: 0, rowCount: Order - 1, columnIndex: 0, columnCount: B.ColumnCount
+                    )
+                );
+            
+            if (!IsAFirstColZero || !Utils.IsEqualToIdentity(AUpperRight) || !IsBFirstElementsZero)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public void ComputeTFDenominatorCoeff()
+        {
+            // Assumes First CompanionForm!!
+            Vector<double> Coeff_a = Vector<double>.Build.Dense(size: Order + 1);
+            Coeff_a[0] = 1;
+
+            for (int i = 1; i <= Order; i++)
+            {
+                Coeff_a[i] = -1 * A[Order-1, Order - i];
+            }
+
+            TfCoeff_a = Coeff_a;
+        }
+
+        public void ComputeTFNominatorCoeff()
+        {
+            if (D.ColumnCount > 1)
+            {
+                throw new InvalidDimensionsException("SS2TF currently only supported for Single Input systems.");
+            }
+            Matrix<double> Coeff_b = Matrix<double>.Build.Dense(rows: C.RowCount, columns: Order);
+
+            for (int i = 0; i < C.RowCount; i++)
+            {
+                for (int j = 0; j < Order; j++)
+                {
+                    Console.WriteLine($"B_({i},{j})= {C[i, Order - j - 1]} + {TfCoeff_a[j+1]} * {D[i, 0]} = {C[i, Order - j - 1] + TfCoeff_a[j+1] * D[i, 0]}");
+                    Coeff_b[i, j] = C[i, Order - j - 1] + TfCoeff_a[j + 1] * D[i, 0];
+                }
+            }
+
+            TfCoeff_b = Coeff_b;
+        }
+
+
+        public void DetermineTFCoefficients()
+        {
+            if (!IsInFirstCompanionForm())
+            {
+                throw new InvalidDimensionsException(
+                    "System not in First Companion Form. Can't compute TF coefficients directly.");
+            }
+            // Apply coefficients formula
+
+            ComputeTFDenominatorCoeff();
+            ComputeTFNominatorCoeff();
+        }
+
+        //public bool IsStable() --> Check if all Cont eigenvalues have negative real part / Discrete are within unit circle
+
+
+
+
+
         public void PrintContinuousModel()
         {
             Console.WriteLine($"LTI-state-space model\n A:\n{A}\n\nB:\n{B}\n\nC:\n{C}\n\nD:\n{D}\n\n");
