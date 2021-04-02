@@ -151,9 +151,9 @@ namespace Test
             {
                 Console.WriteLine("ComputeTfCoeff_a failed.");
             }
-            Console.WriteLine($"den: {Model.TfCoeff_a}, num: {Model.TfCoeff_b}");
+            //Console.WriteLine($"den: {Model.TfCoeff_a}, num: {Model.TfCoeff_b}");
 
-            
+            Console.WriteLine(Model.IsStable());
         }
 
 

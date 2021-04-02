@@ -5,15 +5,26 @@ using MathNet.Numerics.LinearAlgebra.Factorization;
 
 namespace ControlToolBox
 {
+    // TODOs
+    // Add logging
+    // Add KalmanFilter
     public class StateSpace
     {
+        // System dynamical characteristics
         public Matrix<double> A { get; private set; }
         public Vector<System.Numerics.Complex> EigenValues { get; private set; }
         public Matrix<double> EigenVectors { get; private set; }
+        public Vector<double> TfCoeff_a { get; private set; }
+        public Matrix<double> TfCoeff_b { get; private set; }
 
-        Matrix<double> I; //Identify matrix with shape of A
+        // System characteristics
+        Matrix<double> I; //Identity matrix with shape of A
         public int Order { get; private set; }
 
+        Matrix<double> R; // Controllability Gramian
+        Matrix<double> W; // Observability Gramian
+
+        // System matrices
         public Matrix<double> B { get; private set; }
         public Matrix<double> C { get; private set; }
         public Matrix<double> D { get; private set; }
@@ -23,18 +34,16 @@ namespace ControlToolBox
         public Matrix<double> Cd { get; private set; }
         public Matrix<double> Dd { get; private set; }
 
+        // State and output vectors
         public Vector<double> x_k { get; private set; }
         public Vector<double> x_knext { get; private set; }
         public Vector<double> y_k { get; private set; }
 
-        public Vector<double> TfCoeff_a { get; private set; }
-        public Matrix<double> TfCoeff_b { get; private set; }
-
+        // AD conversion
         double? Tsample;
 
-        Matrix<double> R; // Controllability Gramian
-        Matrix<double> W; // Observability Gramian
 
+        // Init functions
         private void CheckMatrixDimensions(
             Matrix<double> A, Matrix<double> B, Matrix<double> C, Matrix<double> D
             )
@@ -130,6 +139,7 @@ namespace ControlToolBox
 
         }
 
+        // AD conversion functions
         private double CheckAliasing(double coeff = 0.1)
         {
 
@@ -212,33 +222,7 @@ namespace ControlToolBox
             Dd = D;
         }
 
-        private void RunModelStep(Vector<double> u_k)
-        {
-            x_k = x_knext;
-            x_knext = Ad * x_k + Bd * u_k;
-            y_k = Cd * x_k + Dd * u_k;
-        }
-
-        public Vector<double> SimulateStep(Vector<double> u_k, double? Ts = null)
-        {
-            if (u_k.Count != this.B.ColumnCount)
-            { throw new InvalidDimensionsException("control vector and B matrix dimensions do not match."); }
-
-            if (Ts == null && Tsample == null)
-            {
-                throw new SamplingRateRequiredException("Please provide a sampling rate or step size.");
-            }
-
-            else if (Ts != null) // Recalibrate discrete model to given Ts
-            {
-                ContinuousToDiscrete((double)Ts);
-            }
-
-            RunModelStep(u_k);
-
-            return y_k;
-        }
-
+        // Model characteristics checks
         public Matrix<double> ComputeControllabilityMatrix()
         {
             // first term of sum
@@ -263,22 +247,28 @@ namespace ControlToolBox
             return W.Transpose();
         }
 
-        private bool CheckRank(Matrix<double> M, int Rank)
-        {
-            if (M.Rank() == Rank) { return true; }
-            return false;
-        }
-
         public bool IsControllable()
         {
             R = ComputeControllabilityMatrix();
-            return CheckRank(R, Rank: Order);
+            return Utils.CheckRank(R, Rank: Order);
         }
 
         public bool IsObservable()
         {
             W = ComputeObservabilityMatrix();
-            return CheckRank(W, Rank: Order);
+            return Utils.CheckRank(W, Rank: Order);
+        }
+
+        public bool IsStable()
+        {
+            foreach (double element in EigenValues.Real())
+            {
+                if (element > 0)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         public bool IsInFirstCompanionForm()
@@ -300,6 +290,7 @@ namespace ControlToolBox
             return true;
         }
 
+        // StateSpace to Transfer Function
         public void ComputeTFDenominatorCoeff()
         {
             // Assumes First CompanionForm!!
@@ -326,14 +317,12 @@ namespace ControlToolBox
             {
                 for (int j = 0; j < Order; j++)
                 {
-                    Console.WriteLine($"B_({i},{j})= {C[i, Order - j - 1]} + {TfCoeff_a[j+1]} * {D[i, 0]} = {C[i, Order - j - 1] + TfCoeff_a[j+1] * D[i, 0]}");
                     Coeff_b[i, j] = C[i, Order - j - 1] + TfCoeff_a[j + 1] * D[i, 0];
                 }
             }
 
             TfCoeff_b = Coeff_b;
         }
-
 
         public void DetermineTFCoefficients()
         {
@@ -348,12 +337,38 @@ namespace ControlToolBox
             ComputeTFNominatorCoeff();
         }
 
-        //public bool IsStable() --> Check if all Cont eigenvalues have negative real part / Discrete are within unit circle
+        // Time domain stuff - simulation
+
+        private void RunModelStep(Vector<double> u_k)
+        {
+            x_k = x_knext;
+            x_knext = Ad * x_k + Bd * u_k;
+            y_k = Cd * x_k + Dd * u_k;
+        }
+
+        public Vector<double> SimulateStep(Vector<double> u_k, double? Ts = null)
+        {
+            if (u_k.Count != this.B.ColumnCount)
+            { throw new InvalidDimensionsException("control vector and B matrix dimensions do not match."); }
+
+            if (Ts == null && Tsample == null)
+            {
+                throw new SamplingRateRequiredException("Please provide a sampling rate.");
+            }
+
+            else if (Ts != null) // Recalibrate discrete model to given Ts
+            {
+                ContinuousToDiscrete((double)Ts);
+            }
+
+            RunModelStep(u_k);
+
+            return y_k;
+        }
 
 
 
-
-
+        // Printing function
         public void PrintContinuousModel()
         {
             Console.WriteLine($"LTI-state-space model\n A:\n{A}\n\nB:\n{B}\n\nC:\n{C}\n\nD:\n{D}\n\n");
