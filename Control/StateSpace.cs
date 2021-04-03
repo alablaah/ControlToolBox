@@ -40,7 +40,7 @@ namespace ControlToolBox
         public Vector<double> y_k { get; private set; }
 
         // AD conversion
-        double? Tsample;
+        public double? Tsample { get; private set; }
 
 
         // Init functions
@@ -184,6 +184,11 @@ namespace ControlToolBox
         private void LaplaceBasedExactDiscratization(double Ts)
         {
             // How to do inverse Laplace transform?
+        }
+
+        private void VerletDiscretization(double Ts)
+        {
+            //Based on LeapFrog method: sympltecic!
         }
 
         private void DiscretizationMethodSwitch(string type, double Ts)
